@@ -12,21 +12,21 @@
 // limitations under the License.
 // ----------------------------------------------------------------------------------
 
+using System.Collections.Generic;
+
+
 namespace Microsoft.Azure.Commands.Common.Authentication.Abstractions
 {
-    /// <summary>
-    /// An Azure Active Directory Tenant
-    /// </summary>
-    public interface IAzureTenant : IExtensibleModel
+    public partial interface ISubscriptionAndTenantHelper
     {
-        /// <summary>
-        /// The Tenant Identifier (GUID)
-        /// </summary>
-        string Id { get; set; }
+        List<AzureTenant> ListAccountTenants(IAccessToken accessToken, IAzureEnvironment environment);
 
-        /// <summary>
-        /// The domain name suffix for the directory (domain)
-        /// </summary>
-        string Directory { get; set; }
+        IEnumerable<AzureSubscription> ListAllSubscriptionsForTenant(IAccessToken accessToken, IAzureAccount account, IAzureEnvironment environment);
+
+        AzureSubscription GetSubscriptionById(string subscriptionId, IAccessToken accessToken, IAzureAccount account, IAzureEnvironment environment);
+
+        bool TestCompatibility(IAccessToken accessToken, IAzureEnvironment environment);
+
+        string ApiVersion { get; }
     }
 }

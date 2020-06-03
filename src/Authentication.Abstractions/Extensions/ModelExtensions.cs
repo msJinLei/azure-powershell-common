@@ -12,6 +12,8 @@
 // limitations under the License.
 // ----------------------------------------------------------------------------------
 
+using System.Collections.Generic;
+
 namespace Microsoft.Azure.Commands.Common.Authentication.Abstractions
 {
     /// <summary>
@@ -51,6 +53,11 @@ namespace Microsoft.Azure.Commands.Common.Authentication.Abstractions
             }
 
             return result;
+        }
+
+        public static List<string> GetTenants(this IExtensibleModel model)
+        {
+            return new List<string>(model.GetPropertyAsArray(AzureAccount.Property.Tenants));
         }
 
         /// <summary>

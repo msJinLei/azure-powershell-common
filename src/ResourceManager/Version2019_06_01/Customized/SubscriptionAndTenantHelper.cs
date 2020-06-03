@@ -15,22 +15,27 @@
 using Microsoft.Azure.Commands.Common.Authentication;
 using Microsoft.Azure.Commands.Common.Authentication.Abstractions;
 using Microsoft.Azure.Commands.ResourceManager.Common.Paging;
-using Microsoft.Azure.Internal.Subscriptions;
-using Microsoft.Azure.Internal.Subscriptions.Models;
-using Microsoft.Azure.Internal.Subscriptions.Models.Utilities;
+using Microsoft.Azure.Management.ResourceManager.Version2019_06_01;
+using Microsoft.Azure.Management.ResourceManager.Version2019_06_01.Models;
+using Microsoft.Azure.Management.ResourceManager.Version2019_06_01.Models.Utilities;
 using Microsoft.Rest;
 using Microsoft.Rest.Azure;
 using Microsoft.WindowsAzure.Commands.Utilities.Common;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Microsoft.Azure.Commands.ResourceManager.Common.Utilities
+namespace Microsoft.Azure.Commands.ResourceManager.Common.Utilities.Version2019_06_01
 {
     public class SubscriptionAndTenantHelper : ISubscriptionAndTenantHelper
     {
         public SubscriptionAndTenantHelper()
         {
-            ApiVersion = "2016-06-01";
+            ApiVersion = "2019-06-01";
+        }
+
+        private static GenericPageEnumerable<Subscription> ListAllSubscriptions(ISubscriptionClient client)
+        {
+            return new GenericPageEnumerable<Subscription>(client.Subscriptions.List, client.Subscriptions.ListNext, ulong.MaxValue, 0);
         }
 
         public List<AzureTenant> ListAccountTenants(IAccessToken accessToken, IAzureEnvironment environment)
@@ -44,7 +49,6 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common.Utilities
                     environment.GetEndpointAsUri(AzureEnvironment.Endpoint.ResourceManager),
                     new TokenCredentials(accessToken.AccessToken) as ServiceClientCredentials,
                     AzureSession.Instance.ClientFactory.GetCustomHandlers());
-
                 var tenants = subscriptionClient.Tenants.List();
                 if (tenants != null)
                 {
@@ -92,17 +96,12 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common.Utilities
                 {
                     return subscription.ToAzureSubscription(account, environment, accessToken.TenantId);
                 }
+                return null;
             }
-
-            return null;
-        }
-
-        private static GenericPageEnumerable<Subscription> ListAllSubscriptions(ISubscriptionClient client)
-        {
-            return new GenericPageEnumerable<Subscription>(client.Subscriptions.List, client.Subscriptions.ListNext, ulong.MaxValue, 0);
         }
 
         public string ApiVersion { get; private set; }
+        
         public bool TestCompatibility(IAccessToken accessToken, IAzureEnvironment environment)
         {
             using (var subscriptionClient = AzureSession.Instance.ClientFactory.CreateCustomArmClient<SubscriptionClient>(

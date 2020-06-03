@@ -12,21 +12,21 @@
 // limitations under the License.
 // ----------------------------------------------------------------------------------
 
-namespace Microsoft.Azure.Commands.Common.Authentication.Abstractions
-{
-    /// <summary>
-    /// An Azure Active Directory Tenant
-    /// </summary>
-    public interface IAzureTenant : IExtensibleModel
-    {
-        /// <summary>
-        /// The Tenant Identifier (GUID)
-        /// </summary>
-        string Id { get; set; }
+using Microsoft.Azure.Commands.Common.Authentication;
+using Microsoft.Azure.Commands.Common.Authentication.Abstractions;
+using Microsoft.Azure.Commands.ResourceManager.Common;
 
-        /// <summary>
-        /// The domain name suffix for the directory (domain)
-        /// </summary>
-        string Directory { get; set; }
+namespace Microsoft.Azure.Internal.Subscriptions.Models.Utilities
+{
+    public static class TenantIdDescriptionExtensions
+    {
+        public static AzureTenant ToAzureTenant(this TenantIdDescription other, IAccessToken accessToken)
+        {
+            var tenant = new AzureTenant();
+            tenant.Id = other.TenantId;
+            tenant.Directory = accessToken.GetDomain();
+
+            return tenant;
+        }
     }
 }

@@ -19,6 +19,7 @@ using Microsoft.Azure.Commands.Common.Authentication.Abstractions.Core;
 #endif
 using Microsoft.Azure.Commands.Common.Authentication.Models;
 using Microsoft.Azure.Commands.ResourceManager.Common.Properties;
+using Microsoft.Azure.Commands.ResourceManager.Common.Utilities;
 using Microsoft.Azure.Management.Internal.Resources;
 using Microsoft.Azure.Management.Internal.Resources.Utilities.Models;
 using Microsoft.Rest;
@@ -30,6 +31,7 @@ using System.Globalization;
 using System.Linq;
 using System.Management.Automation;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Text;
 
@@ -92,7 +94,7 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common
             var subscriptionList = CheckAccessToSubscriptions(subscriptionIds);
 
             //get all the non default tenant ids for the subscriptions
-            var nonDeafultTenantIds = subscriptionList?.Select(s => s.GetTenant())?.Distinct()?.Where(t => t != DefaultContext.Tenant.GetId().ToString());
+            var nonDeafultTenantIds = subscriptionList?.SelectMany(s => s.GetTenants()).Distinct()?.Where(t => t != DefaultContext.Tenant.GetId().ToString());
 
             if ((nonDeafultTenantIds != null) && (nonDeafultTenantIds.Count() > 0))
             {
@@ -128,7 +130,7 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common
                 //this does not mean that the user does not have access to the subs, it just menas that the local context did not have them
                 //We gotta now call into the subscription RP and see if the user really does not have access to these subscriptions
 
-                var result = Utilities.SubscriptionAndTenantHelper.GetTenantsForSubscriptions(subscriptionsNotInDefaultProfile.ToList(), DefaultContext);
+                var result = GetTenantsForSubscriptions(subscriptionsNotInDefaultProfile.ToList(), DefaultContext);
 
                 if (result.Count < subscriptionsNotInDefaultProfile.Count())
                 {
@@ -152,7 +154,7 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common
 
         private IAccessToken GetTokenForTenant(string tenantId)
         {
-            return Utilities.SubscriptionAndTenantHelper.AcquireAccessToken(DefaultContext.Account,
+            return AcquireAccessToken(DefaultContext.Account,
                 DefaultContext.Environment,
                 tenantId);
         }
@@ -504,6 +506,58 @@ namespace Microsoft.Azure.Commands.ResourceManager.Common
             }
 
             return false;
+        }
+
+        internal static IAccessToken AcquireAccessToken(IAzureAccount account, IAzureEnvironment environment, string tenantId)
+        {
+            return AzureSession.Instance.AuthenticationFactory.Authenticate(
+               account,
+               environment,
+               tenantId,
+               null,
+               ShowDialog.Never,
+               null);
+        }
+
+        internal static Dictionary<string, AzureSubscription> GetTenantsForSubscriptions(List<string> subscriptionIds, IAzureContext defaultContext)
+        {
+            Dictionary<string, AzureSubscription> result = new Dictionary<string, AzureSubscription>();
+
+            if (subscriptionIds != null && subscriptionIds.Count != 0)
+            {
+                //First get all the tenants, then get subscriptions in each tenant till we exhaust the subscriotions sent in
+                //Or we exhaust the tenants
+                ISubscriptionAndTenantHelper subscriptionHelper = new SubscriptionAndTenantHelper();
+                var accessTokenForCommon = AcquireAccessToken(defaultContext.Account, defaultContext.Environment, SubscriptionAndTenantUtility.GetCommonTenant(defaultContext.Account));
+                IEnumerable<AzureTenant> tenants = subscriptionHelper.ListAccountTenants(accessTokenForCommon, defaultContext.Environment);
+                //fixme set account tenants property
+
+                HashSet<string> subscriptionIdSet = new HashSet<string>(subscriptionIds);
+
+                foreach (var tenant in tenants)
+                {
+                    if (subscriptionIdSet.Count <= 0)
+                    {
+                        break;
+                    }
+
+                    var tId = tenant.GetId().ToString();
+                    var accessToken = AcquireAccessToken(defaultContext.Account, defaultContext.Environment, tId);
+                    var subscriptions = subscriptionHelper.ListAllSubscriptionsForTenant(accessToken, defaultContext.Account, defaultContext.Environment);
+
+                    subscriptions?.ForEach((s) =>
+                    {
+                        var sId = s.GetId().ToString();
+                        if (subscriptionIdSet.Contains(sId))
+                        {
+                            result.Add(sId, s);
+                            subscriptionIdSet.Remove(sId);
+                        }
+                    });
+                }
+            }
+
+            return result;
         }
     }
 }
